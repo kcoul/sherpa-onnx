@@ -220,9 +220,21 @@ class OfflineTtsKokoroImpl : public OfflineTtsImpl {
       }
     }
 
-    std::vector<TokenIDs> token_ids = frontend_->ConvertTextToTokenIds(
-        text, config_.model.kokoro.lang.empty() ? meta_data.voice
-                                                : config_.model.kokoro.lang);
+    // For multi-lang Kokoro models, if a lexicon is explicitly provided and
+    // user didn't force --kokoro-lang, prefer lexicon-based conversion for
+    // non-Chinese text. This keeps in-vocab words deterministic and falls back
+    // to eSpeak only for OOV words.
+    std::string lang_or_voice;
+    if (!config_.model.kokoro.lexicon.empty() && config_.model.kokoro.lang.empty()) {
+      lang_or_voice = "";
+    } else {
+      lang_or_voice =
+          config_.model.kokoro.lang.empty() ? meta_data.voice
+                                            : config_.model.kokoro.lang;
+    }
+
+    std::vector<TokenIDs> token_ids =
+        frontend_->ConvertTextToTokenIds(text, lang_or_voice);
 
     if (token_ids.empty() ||
         (token_ids.size() == 1 && token_ids[0].tokens.empty())) {

@@ -331,6 +331,7 @@ class KokoroMultiLangLexicon::Impl {
 
     for (const auto &_word : words) {
       auto word = ToLowerCase(_word);
+
       if (IsPunctuation(word)) {
         this_sentence.push_back(token2id_.at(word));
 
@@ -369,8 +370,15 @@ class KokoroMultiLangLexicon::Impl {
         }
 
         piper::eSpeakPhonemeConfig config;
-
-        config.voice = meta_data_.voice;
+        // meta_data_.voice can be a model speaker tag (e.g., af_bella) rather
+        // than an eSpeak language voice. For OOV fallback, prefer a known
+        // eSpeak English voice unless the selected voice looks language-like.
+        config.voice = "en-us";
+        if (!voice.empty()) {
+          config.voice = voice;
+        } else if (meta_data_.voice.find('-') != std::string::npos) {
+          config.voice = meta_data_.voice;
+        }
 
         std::vector<std::vector<piper::Phoneme>> phonemes;
 
@@ -393,6 +401,11 @@ class KokoroMultiLangLexicon::Impl {
               }
             }
           }
+        }
+
+        if (debug_ && ids.empty()) {
+          SHERPA_ONNX_LOGE("eSpeak produced no phonemes for OOV '%s' (voice=%s)",
+                           word.c_str(), config.voice.c_str());
         }
 
         if (this_sentence.size() + ids.size() + 3 > max_len - 2) {
